@@ -4,17 +4,17 @@ DataForSEO v3 CLI with concise SEO workflows and complete API access driven by D
 
 ## Setup
 
-Private repository install with an authenticated GitHub CLI:
+Install the latest release:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/simonbalfe/dataforseo-cli/main/install.sh | sh
+```
+
+Install using GitHub CLI:
 
 ```sh
 gh api repos/simonbalfe/dataforseo-cli/contents/install.sh \
   -H "Accept: application/vnd.github.raw+json" | sh
-```
-
-For a public repository, the equivalent one-line installer is:
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/simonbalfe/dataforseo-cli/main/install.sh | sh
 ```
 
 The installer downloads the latest native binary for macOS or Linux into `~/.local/bin`. Override the destination or version with `DFS_INSTALL_DIR` and `DFS_VERSION`.
