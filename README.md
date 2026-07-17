@@ -7,7 +7,7 @@ DataForSEO v3 CLI with concise SEO workflows and complete API access driven by D
 Install the latest release:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/simonbalfe/dataforseo-cli/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/simonbalfe/dataforseo-cli/refs/heads/main/install.sh | sh
 ```
 
 Install using GitHub CLI:
