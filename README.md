@@ -25,7 +25,13 @@ Build from source:
 go install .
 ```
 
-Auth via `DATAFORSEO_USERNAME` / `DATAFORSEO_PASSWORD` (already in `~/.zshrc`).
+Authenticate interactively after installation:
+
+```sh
+dfs auth
+```
+
+The command validates the credentials and saves them in the operating system credential vault. For automation, `DATAFORSEO_USERNAME` and `DATAFORSEO_PASSWORD` remain supported and take precedence. Remove saved credentials with `dfs auth logout`.
 
 - `main.go` contains the native Go CLI and direct REST client.
 - Authentication uses HTTP Basic auth with API credentials.
@@ -35,6 +41,7 @@ Auth via `DATAFORSEO_USERNAME` / `DATAFORSEO_PASSWORD` (already in `~/.zshrc`).
 
 ```
 dfs serp <keyword>              Google organic SERP
+dfs auth                        securely save DataForSEO API credentials
 dfs volume <kw...>              Google Ads search volume
 dfs suggestions <keyword>       keyword suggestions with volume + difficulty
 dfs ranked <domain>             keywords a domain ranks for

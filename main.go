@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/base64"
@@ -18,11 +19,14 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/zalando/go-keyring"
+	"golang.org/x/term"
 	"gopkg.in/yaml.v3"
 )
 
 const baseURL = "https://api.dataforseo.com/v3"
 const specURL = "https://raw.githubusercontent.com/dataforseo/OpenApiDocumentation/master/openapi_specification.yaml"
+const keyringService = "dataforseo-cli"
 
 type object = map[string]any
 
@@ -47,8 +51,19 @@ type gridPoint struct {
 func newClient() (*client, error) {
 	username := os.Getenv("DATAFORSEO_USERNAME")
 	password := os.Getenv("DATAFORSEO_PASSWORD")
+	if username == "" && password == "" {
+		var err error
+		username, err = keyring.Get(keyringService, "username")
+		if err != nil && !errors.Is(err, keyring.ErrNotFound) {
+			return nil, fmt.Errorf("read credentials: %w", err)
+		}
+		password, err = keyring.Get(keyringService, "password")
+		if err != nil && !errors.Is(err, keyring.ErrNotFound) {
+			return nil, fmt.Errorf("read credentials: %w", err)
+		}
+	}
 	if username == "" || password == "" {
-		return nil, errors.New("set DATAFORSEO_USERNAME and DATAFORSEO_PASSWORD")
+		return nil, errors.New("not authenticated; run dfs auth or set DATAFORSEO_USERNAME and DATAFORSEO_PASSWORD")
 	}
 	return &client{http: &http.Client{Timeout: 90 * time.Second}, username: username, password: password}, nil
 }
@@ -243,8 +258,55 @@ func addLocaleFlags(command *cobra.Command, location, language *string) {
 
 func newRoot() *cobra.Command {
 	root := &cobra.Command{Use: "dfs", Short: "DataForSEO CLI", SilenceUsage: true, SilenceErrors: true}
-	root.AddCommand(newSerp(), newVolume(), newSuggestions(), newRanked(), newCompetitors(), newDifficulty(), newLocalRank(), newLocalGrid(), newBalance(), newAPI())
+	root.AddCommand(newAuth(), newSerp(), newVolume(), newSuggestions(), newRanked(), newCompetitors(), newDifficulty(), newLocalRank(), newLocalGrid(), newBalance(), newAPI())
 	return root
+}
+
+func newAuth() *cobra.Command {
+	command := &cobra.Command{Use: "auth", Short: "authenticate with DataForSEO", Args: cobra.NoArgs, RunE: func(command *cobra.Command, _ []string) error {
+		reader := bufio.NewReader(command.InOrStdin())
+		fmt.Fprint(command.OutOrStdout(), "DataForSEO API login: ")
+		username, err := reader.ReadString('\n')
+		if err != nil {
+			return err
+		}
+		username = strings.TrimSpace(username)
+		if username == "" {
+			return errors.New("API login is required")
+		}
+		fmt.Fprint(command.OutOrStdout(), "DataForSEO API password: ")
+		passwordBytes, err := term.ReadPassword(int(os.Stdin.Fd()))
+		fmt.Fprintln(command.OutOrStdout())
+		if err != nil {
+			return fmt.Errorf("read password: %w", err)
+		}
+		password := strings.TrimSpace(string(passwordBytes))
+		if password == "" {
+			return errors.New("API password is required")
+		}
+		candidate := &client{http: &http.Client{Timeout: 30 * time.Second}, username: username, password: password}
+		if _, err := candidate.request(command.Context(), http.MethodGet, "/appendix/user_data", nil); err != nil {
+			return fmt.Errorf("credentials rejected: %w", err)
+		}
+		if err := keyring.Set(keyringService, "username", username); err != nil {
+			return fmt.Errorf("store API login: %w", err)
+		}
+		if err := keyring.Set(keyringService, "password", password); err != nil {
+			return fmt.Errorf("store API password: %w", err)
+		}
+		fmt.Fprintln(command.OutOrStdout(), "Authenticated. Credentials saved in the operating system credential vault.")
+		return nil
+	}}
+	command.AddCommand(&cobra.Command{Use: "logout", Short: "remove saved DataForSEO credentials", Args: cobra.NoArgs, RunE: func(command *cobra.Command, _ []string) error {
+		for _, account := range []string{"username", "password"} {
+			if err := keyring.Delete(keyringService, account); err != nil && !errors.Is(err, keyring.ErrNotFound) {
+				return err
+			}
+		}
+		fmt.Fprintln(command.OutOrStdout(), "Saved DataForSEO credentials removed.")
+		return nil
+	}})
+	return command
 }
 
 func newSerp() *cobra.Command {
